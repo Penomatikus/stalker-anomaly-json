@@ -1,0 +1,165 @@
+--[[
+	utils_json provides functions to convert Lua's basic types into valid json.
+	One exception are CFunctions, where only CTime is supported.
+
+	Use to_logfile(table, filename) to 
+	
+]]
+
+local open = "{"
+local close = "}"
+local ln = "\n"
+
+local err = '\t"__error": '
+local err_empty_args = '"missing arguments: convert_table(table, filename), got 1 want 2"' 
+local err_not_a_table = function(typ_e) return '"cannot convert a non table type: ' .. typ_e .. '"' end
+
+-- Repeat node_depth times "\t" to ident a nodes value correctly
+function ident(node_depth) return string.rep("\t", node_depth) end 
+-- Bake the json-data into "{ }"
+function bake_json(data) return open .. ln .. data .. ln .. close end
+-- Opposite of bake_json(data), just return the data without "{ }"
+function no_bake(data) return data end
+
+function to_logfile(value, filename)
+	local appdatalog = getFS():update_path("$logs$","")
+	local logfile = io.open(appdatalog .. "/" .. filename .. ".json","w")
+	if logfile ~= nil then
+		logfile:write(type_dispatcher(filename, value, 1))
+		logfile:close()
+	else 
+		printdbg("~ utils_json | the file [%s.json] is unavailable", filename)
+	end
+end
+
+function type_dispatcher(json_key_name, value, node_depth, bake_Fn)
+	local cmd = type(value)
+	local handler = json_handlers[cmd]
+	if not handler then
+		return bake_Fn(string.format('\t"%s": "unsupported type %s"', json_key_name, cmd))
+	end
+	return handler(json_key_name, value, node_depth, bake_Fn)
+end
+
+-- convert_table takes a table and returns the string representation in valid JSON.
+-- It provides error handling and just returns "{"__error:" <err-msg> }", if used wrong.
+--
+-- @param table     The table to be converted
+-- @param tablename The name of the table as parent node
+-- @return A valid JSON string representation of table
+-- 
+function convert_table(json_table_name, t, node_depth, bake_Fn)
+	bake_Fn = bake_Fn and bake_Fn or bake_json
+	local json = ""
+	local p_node_depth = node_depth
+	local c_node_depth = node_depth + 1
+
+	-- open then new json node
+	json = string.format('%s"%s": %s', ident(p_node_depth), json_table_name, open)
+	-- close it immediately, if the table is empty
+	if not next(t) then
+		return json .. close
+	end
+
+	json = json .. ln
+
+	for k, v in pairs(t) do 
+		-- handle type convertion via dispatcher, also we do not want to bake the cake
+		json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
+		-- End of node check
+		json = json .. (next(t, k) and "," .. ln or ln .. ident(p_node_depth) .. close)
+	end
+
+	return bake_Fn(json)
+end
+
+-- Returns a JSON representation of a number.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param n 			The number to be converted
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_number(json_key_name, n, node_depth, bake_Fn) 
+	bake_Fn = bake_Fn and bake_Fn or bake_json
+	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key_name, tostring(n)))
+end
+
+-- Returns a JSON representation of a function.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param b				The boolean to be converted
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_boolean(json_key_name, b, node_depth, bake_Fn) 
+	return convert_number(json_key_name, b, node_depth, bake_Fn) 
+end
+
+-- Returns a JSON representation of a nil value.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param v				Will always be "null"
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_nil(json_key_name, v, node_depth, bake_Fn) 
+	v = "null"
+	return convert_number(json_key_name, v, node_depth, bake_Fn) 
+end
+
+-- Returns a JSON representation of a function.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param s 			The string to be converted
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_string(json_key_name, s, node_depth, bake_Fn) 
+	bake_Fn = bake_Fn and bake_Fn or bake_json
+	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key_name, tostring(s)))
+end
+
+-- TODO: This obsolete, I need to to get the arg-list in Lua 5.1
+-- Returns a JSON representation of a function.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param f 			The function to be converted
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_function(json_key_name, f, node_depth, bake_Fn)
+	bake_Fn = bake_Fn and bake_Fn or bake_json
+  	if type(f) ~= "function" then
+		return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key_name, "not a function"))
+  	end
+	return bake_Fn(
+		string.format('%s"%s":"%s"', ident(node_depth), json_key_name, (debug.getinfo(f, "n").name or "anonymous") .. "( )")
+	)
+end
+
+-- Returns a json representation of the the provided userdata u.
+--
+-- @param node_depth 	N-times "/t" string-prefix 
+-- @param json_key_name	Not the key name
+-- @param u 			The userdata to be converted
+-- @bake_Fn				Default is utils_json.bake_json(data)
+function convert_userdata(json_key_name, u, node_depth, bake_Fn)
+	bake_Fn = bake_Fn and bake_Fn or bake_json
+	-- engine timestamp to RFC3339 +02:00 (because monolith is in ukraine).
+	if u.timeToString then 
+		local dt = utils_data.CTime_to_table(u)
+		local rfc3339 = string.format('%04d-%02d-%02dT%02d:%02d:%02d.%03d+02:00', dt.Y, dt.M, dt.D, dt.h, dt.m, dt.s, dt.ms)
+		return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key_name, rfc3339))
+	end
+	-- Append new userdata convertions here
+	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key_name, "unsupported userdata type"))
+end
+
+-- json_handlers registes a lua type to a reference of a json converting function 
+-- Note: The functions need to be read by the compiler first to make them referencable
+-- 		 If you want to add new handlers, they need to be above `json_handlers`
+json_handlers = {
+	["boolean"] = convert_boolean,
+	["function"] = convert_function,
+	["nil"] = convert_nil,
+	["number"] = convert_number,
+	["string"] = convert_string,
+	["table"] = convert_table,
+	["userdata"] = convert_userdata,
+}
