@@ -9,7 +9,7 @@
 	process the input.
 	
 	Use to_json(value, keyname) to create a JSON string: 
-		utils_json.to_json(db.actor:character_community(), "faction")
+	utils_json.to_json(db.actor:character_community(), "faction")
 	will result in: 
 	"{
 		"faction": ""actor_zombied""
@@ -31,43 +31,44 @@ local open = "{"
 local close = "}"
 local ln = "\n"
 
--- Repeat "\t" node_depth times to ident a nodes value correctly
+---Repeat "\t" node_depth times to ident a nodes value correctly 
+---@param node_depth number
+---@return string
 local function ident(node_depth) return string.rep("\t", node_depth) end 
--- Bake the json-data into "{ }"
+---Bake the json-data into "{ }"
+---@param data string
+---@return string
 local function bake_json(data) return open .. ln .. data .. ln .. close end
--- Opposite of bake_json(data), just return the data without "{ }"
+---Opposite of bake_json(data), just return the data without "{ }"
+---@param data string
+---@return string
 local function no_bake(data) return data end
 
--- A dispatcher to choose the correct json handler by the type of value
+--------------------------------------------------------------
+-- Local functions: dispatcher & handlers
+--------------------------------------------------------------
+
+---json_handlers registes the handlers
+local json_handlers = { }
+
+---A dispatcher to choose the correct json handler by the type of value
+---@param json_key string
+---@param value any
+---@param node_depth number
+---@param bake_Fn? function
+---@return string
 local function type_dispatcher(json_key, value, node_depth, bake_Fn)
 	local cmd = type(value)
+	printdbg("~ utils_json | value is [%s]", cmd)
 	local handler = json_handlers[cmd]
 	if not handler then
-		err_not_implemented = "no json handler not implemented for: " .. cmd
-		return json_handlers["string"](json_key, value, node_depth, no_bake)
+		err_not_implemented = "no json handler implemented for: " .. cmd
+		return json_handlers["string"](json_key, err_not_implemented, node_depth, no_bake)
 	end
 	return handler(json_key, value, node_depth, bake_Fn)
 end
 
--- to_json takes a Lua value and a desired key name and creates a valid json.
-function to_json(value, keyname) 
-	return type_dispatcher(keyname, value, 1)
-end
-
--- to_logfile takes a Lua value and a desired filename and writes the valid json representation to 
--- /appdata/logs/filename.json. The filename is handled as the root-node json key.
-function to_logfile(value, filename)
-	local appdatalog = getFS():update_path("$logs$","")
-	local logfile = io.open(appdatalog .. "/" .. filename .. ".json","w")
-	if logfile ~= nil then
-		logfile:write(type_dispatcher(filename, value, 1))
-		logfile:close()
-	else 
-		printdbg("~ utils_json | the file [%s.json] is unavailable", filename)
-	end
-end
-
--- A json handler for lua tables
+---A json handler for lua tables
 local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	local json = ""
@@ -93,44 +94,40 @@ local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	return bake_Fn(json)
 end
 
--- A json handler for lua numbers
+---A json handler for lua numbers
 local function number_handler(json_key, n, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, tostring(n)))
 end
 
--- A json handler for lua booleans
+---A json handler for lua booleans
 local function boolean_handler(json_key, b, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, tostring(b)))
 end
 
--- A json handler for lua nil values
+---A json handler for lua nil values
 local function nil_handler(json_key, v, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	v = "null"
 	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, v))
 end
 
--- A json handler for lua strings
+---A json handler for lua strings
 local function string_handler(json_key, s, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, tostring(s)))
 end
 
--- TODO: This obsolete, I need to to get the arg-list in Lua 5.1
--- A json handler for lua functions
+---TODO: This obsolete, I need to to get the arg-list in Lua 5.1
+---A json handler for lua functions
 local function function_handler(json_key, f, node_depth, bake_Fn)
 	bake_Fn = bake_Fn and bake_Fn or bake_json
-  	if type(f) ~= "function" then
-		return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, "not a function"))
-  	end
-	return bake_Fn(
-		string.format('%s"%s":"%s"', ident(node_depth), json_key, (debug.getinfo(f, "n").name or "anonymous") .. "( )")
-	)
+	local func = (debug.getinfo(f, "n").name or "anonymous") .. "( )"
+	return bake_Fn(string.format('%s"%s":"%s"', ident(node_depth), json_key, func))
 end
 
--- A json handler for lua userdata
+---A json handler for lua userdata
 local function userdata_handler(json_key, u, node_depth, bake_Fn)
 	bake_Fn = bake_Fn and bake_Fn or bake_json
 	-- engine timestamp to RFC3339 +02:00 (because monolith is in ukraine).
@@ -143,10 +140,7 @@ local function userdata_handler(json_key, u, node_depth, bake_Fn)
 	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, "unsupported userdata type"))
 end
 
--- json_handlers registes the handlers
---
--- Note: The handler functions need to be read first by the compiler to make them referencable.
--- 		 If you want to add new handlers, they need to be above `json_handlers`
+---register json_handlers after the compilier kowns about the handlers
 json_handlers = {
 	["boolean"] = boolean_handler,
 	["function"] = function_handler,
@@ -156,3 +150,30 @@ json_handlers = {
 	["table"] = table_handler,
 	["userdata"] = userdata_handler,
 }
+
+--------------------------------------------------------------
+-- Global functions
+--------------------------------------------------------------
+
+---to_json takes a Lua value and a desired key name and creates a valid json.
+---@param value any any of boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil 
+---@param keyname string
+---@return string
+function to_json(value, keyname) 
+	return type_dispatcher(keyname, value, 1)
+end
+
+---to_logfile takes a Lua value and a desired filename and writes the valid json representation to 
+---./appdata/logs/filename.json. The filename is handled as the root-node json key.
+---@param value any any of `boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil`
+---@param filename string
+function to_logfile(value, filename)
+	local appdatalog = getFS():update_path("$logs$","")
+	local logfile = io.open(appdatalog .. "/" .. filename .. ".json","w")
+	if logfile ~= nil then
+		logfile:write(type_dispatcher(filename, value, 1))
+		logfile:close()
+	else 
+		printdbg("~ utils_json | the file [%s.json] is unavailable", filename)
+	end
+end
