@@ -40,4 +40,8 @@ utils_json.to_logfile(game_statistics.actor_miscellaneous, "actor_miscellaneous"
 - *Safe Dispatching*: Prior to invoking any type handler, the dispatcher first searches for a registered handler corresponding to the type of the given value. If no such handler is found, the JSON key's value will invariably read 'no json handler implemented for: _provided_type_'.
 - *Encapsulation*: To prevent misuse, strong encapsulation is employed in the implementation by defining both the dispatcher itself and all associated handlers as local. 
 - *Duck typing*: For userdata, the corresponding handler attempts to call a ctime method on the provided value, applying RFC3339 as the JSON key's value if available and invariably read 'unsupported userdata type' if not. More supported userdata will be added in the future.
-- *Divide and conquer*: When handling tables, the corresponding handler uses implicit recursive calls to itself via the dispatcher, employing a 'divide and conquer' approach.
+- *Divide and conquer*: When handling tables, the corresponding handler uses implicit recursive calls to itself via the dispatcher, employing a 'divide and conquer' approach, instead of handling type dispatching by itsself.
+- *Nil-safe*: By treating nil values as first-class citizens, the script is able to handle them properly, thereby preventing any crashes in the script engine.
+
+## TODO
+- *Optional option pattern*: Adding optional custom userdata handlers, so one can add other engine classes described in lua_help.scipt like `profile_store` 
