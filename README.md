@@ -3,7 +3,7 @@
 Strong and resilient script, to produce valid json strings or logfiles in S.T.A.L.K.E.R. Anomaly. 
 
 Provides two global functions to create valid JSON from the following Lua types: `boolean`,`number`, `string`, `table`, `userdata` and `nil`.
-Where as userdata only allows engine class `CTime` which will be converted to RFC3339+02:00 (because the monolith in in urkrain). Otherwise it justs adds the value: "unsupported userdata type". 
+Where as userdata only allows engine class `CTime` which will be converted to RFC3339+02:00 (because the monolith is in urkrain). Otherwise it justs adds the value: "unsupported userdata type". 
 
 The implementation is using the dispatcher pattern to decouple concerns by defining a handler for each type listed above. It maps these types to corresponding handlers, which are called to process the input.
 
