@@ -42,39 +42,39 @@ It is also possible to retreive rich function information as json.
 ```lua
 --[[ Content of ./appdata/logs/function_showcase.json:
 {
-    "function_showcase": {
-	    "func_ref_in_table": {
+	"function_showcase": {
+		"func_ref_in_table": {
 			"random_coc_func": {
-				"type": "Lua-Function",
-				"name": "r_CTime",
-				"args": "p, caller",
 				"local": false,
 				"source": ".\gamedata\scripts\utils_data.script",
+				"args": "p, caller",
+				"type": "Lua-Function",
+				"name": "r_CTime",
 				"line": 277
 			}
 		},
 		"func_reference": {
-			"type": "Lua-Function",
-			"name": "new_func_for_reference",
-			"args": null,
 			"local": true,
 			"source": ".\gamedata\scripts\bind_stalker.script",
+			"args": null,
+			"type": "Lua-Function",
+			"name": "new_func_for_reference",
 			"line": 441
 		},
 		"func_anonymous": {
-			"type": "Lua-Function",
-			"name": "anonymous",
-			"args": "a, b",
 			"local": false,
 			"source": ".\gamedata\scripts\bind_stalker.script",
-			"line": 444
+			"args": "a, b",
+			"type": "Lua-Function",
+			"name": "anonymous",
+			"line": 445
 		}
 	}
 }
 --]]
 local function new_func_for_reference() end
 local table = {
-	["func_reference"] = new_func_for_reference,
+	func_reference = new_func_for_reference,
 	["func_anonymous"] = function(a, b) print("hi mom! <3") end,
 	["func_ref_in_table"] = { ["random_coc_func"] = utils_data.r_CTime }
 }
