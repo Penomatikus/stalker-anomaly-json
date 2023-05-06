@@ -27,6 +27,10 @@
 
 ]]
 
+
+--------------------------------------------------------------
+-- local helpers
+--------------------------------------------------------------
 local open = "{"
 local close = "}"
 local ln = "\n"
@@ -45,32 +49,58 @@ local function bake_json(data) return open .. ln .. data .. ln .. close end
 local function no_bake(data) return data end
 
 --------------------------------------------------------------
--- Local functions: dispatcher & handlers
+-- dispatcher & handlers
 --------------------------------------------------------------
 
 ---json_handlers registes the handlers
 local json_handlers = { }
 
 ---A dispatcher to choose the correct json handler by the type of value
----@param json_key string
----@param value any
----@param node_depth number
----@param bake_Fn? function
----@return string
+---@param json_key string Not the json key
+---@param value any boolean, number, string, table, userdata(CTime), nil
+---@param node_depth number Not the json node depth
+---@param bake_Fn? function Default is `bake_json(data)` to apply a root encapsulation or not  
+---@return string JSON JSON representation of the value
 local function type_dispatcher(json_key, value, node_depth, bake_Fn)
+	json_key = json_key or "missing key"
 	local cmd = type(value)
-	printdbg("~ utils_json | value is [%s]", cmd)
 	local handler = json_handlers[cmd]
 	if not handler then
+		bake_Fn = node_depth == 1 and bake_json or no_bake -- If > 1, baking is handled by the table_handler
 		err_not_implemented = "no json handler implemented for: " .. cmd
-		return json_handlers["string"](json_key, err_not_implemented, node_depth, no_bake)
+		return json_handlers["string"](json_key, err_not_implemented, node_depth, bake_Fn)
 	end
 	return handler(json_key, value, node_depth, bake_Fn)
 end
 
 ---A json handler for lua tables
+-- local function table_handler(json_table_name, t, node_depth, bake_Fn)
+-- 	bake_Fn = bake_Fn and bake_Fn or bake_json
+-- 	local json = ""
+-- 	local p_node_depth = node_depth
+-- 	local c_node_depth = node_depth + 1
+
+-- 	-- open then new json node
+-- 	json = string.format('%s"%s": %s', ident(p_node_depth), json_table_name, open)
+-- 	-- close it immediately, if the table is empty
+-- 	local next = next -- Avoid indexing the global enviroment hashtable
+-- 	if not next(t) then
+-- 		return json .. close
+-- 	end
+
+-- 	json = json .. ln
+
+-- 	for k, v in pairs(t) do 
+-- 		-- since the table_handler uses his own baking, the dispatcher is called without the bake option
+-- 		json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
+-- 		-- End of node check
+-- 		json = json .. (next(t, k) and "," .. ln or ln .. ident(p_node_depth) .. close)
+-- 	end
+
+-- 	return bake_Fn(json)
+-- end
 local function table_handler(json_table_name, t, node_depth, bake_Fn)
-	bake_Fn = bake_Fn and bake_Fn or bake_json
+	bake_Fn = bake_Fn or bake_json
 	local json = ""
 	local p_node_depth = node_depth
 	local c_node_depth = node_depth + 1
@@ -96,40 +126,74 @@ end
 
 ---A json handler for lua numbers
 local function number_handler(json_key, n, node_depth, bake_Fn) 
-	bake_Fn = bake_Fn and bake_Fn or bake_json
-	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, tostring(n)))
+	bake_Fn = bake_Fn or bake_json
+	return bake_Fn(string.format('%s"%s": %d', ident(node_depth), json_key, n))
 end
 
 ---A json handler for lua booleans
 local function boolean_handler(json_key, b, node_depth, bake_Fn) 
-	bake_Fn = bake_Fn and bake_Fn or bake_json
+	bake_Fn = bake_Fn or bake_json
 	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, tostring(b)))
 end
 
 ---A json handler for lua nil values
 local function nil_handler(json_key, v, node_depth, bake_Fn) 
-	bake_Fn = bake_Fn and bake_Fn or bake_json
+	bake_Fn = bake_Fn or bake_json
 	v = "null"
 	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, v))
 end
 
 ---A json handler for lua strings
 local function string_handler(json_key, s, node_depth, bake_Fn) 
-	bake_Fn = bake_Fn and bake_Fn or bake_json
+	bake_Fn = bake_Fn or bake_json
 	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, tostring(s)))
 end
 
----TODO: This obsolete, I need to to get the arg-list in Lua 5.1
 ---A json handler for lua functions
 local function function_handler(json_key, f, node_depth, bake_Fn)
-	bake_Fn = bake_Fn and bake_Fn or bake_json
-	local func = (debug.getinfo(f, "n").name or "anonymous") .. "( )"
-	return bake_Fn(string.format('%s"%s":"%s"', ident(node_depth), json_key, func))
+	bake_Fn = bake_Fn or bake_json
+	
+	local info = debug.getinfo(f, "S") 
+	if not info or type(info) ~= "table" then 
+		return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, "function()"))
+	end
+    
+	-- parsing the source until `info.linedefined` and extract function information
+	local get_function_info = function() 
+		local pat_local, pat_name_args = "local%s+", "([%a_-]+)%s*%((.*)%)" -- two group matching
+		local path = info.source:sub(2):gsub("[\\/|\\]", "\\\\")
+		local n = 1
+		for line in io.lines(path) do			
+			if n == info.linedefined then
+				local isLocal = string.match(line, pat_local) ~= nil
+				local fn_name, fn_args = string.match(line, pat_name_args)
+				fn_name = fn_name == "function" and "anonymous" or fn_name
+				fn_args = fn_name == "anonymous" and fn_args:gsub("%).*", "") or fn_args
+				return isLocal, fn_name, fn_args
+			end
+			n = n + 1
+		end 
+	end
+
+	local isLocal, name, args = get_function_info()
+	
+	local fn_type = string.format('%s"%s": "%s-Function",\n', ident(node_depth+1), "type", info.what )
+	local fn_name = string.format('%s"%s": "%s",\n', ident(node_depth+1), "name", name )
+	local fn_args = args ~= "" 
+				and  string.format('%s"%s": "%s",\n', ident(node_depth+1), "args", args)
+				or   string.format('%s"%s": %s,\n', ident(node_depth+1), "args", "null")
+	local fn_local = string.format('%s"%s": %s,\n', ident(node_depth+1), "local", isLocal)
+	local fn_sfile = string.format('%s"%s": ".%s",\n', ident(node_depth+1), "source", string.match(info.source, "\\gamedata.*") )
+	local fn_start = string.format('%s"%s": %d\n', ident(node_depth+1), "line", info.linedefined )
+
+	-- using bake_json(...) would result in misposition of the closing bracket 
+	local fn_node = open .. ln .. fn_type .. fn_name .. fn_args .. fn_local .. fn_sfile .. fn_start .. ident(node_depth) .. close
+	return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, fn_node))
 end
 
 ---A json handler for lua userdata
 local function userdata_handler(json_key, u, node_depth, bake_Fn)
-	bake_Fn = bake_Fn and bake_Fn or bake_json
+	bake_Fn = bake_Fn or bake_json
 	-- engine timestamp to RFC3339 +02:00 (because monolith is in ukraine).
 	if u.timeToString then 
 		local dt = utils_data.CTime_to_table(u)
@@ -168,9 +232,10 @@ end
 ---@param value any any of `boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil`
 ---@param filename string
 function to_logfile(value, filename)
+	local fname = filename and filename or "log"
 	local appdatalog = getFS():update_path("$logs$","")
-	local logfile = io.open(appdatalog .. "/" .. filename .. ".json","w")
-	if logfile ~= nil then
+	local logfile = io.open(appdatalog .. "/" .. fname .. ".json","w")
+	if logfile then
 		logfile:write(type_dispatcher(filename, value, 1))
 		logfile:close()
 	else 
