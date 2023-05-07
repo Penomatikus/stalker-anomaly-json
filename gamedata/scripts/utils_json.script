@@ -129,30 +129,36 @@ end
 ---A json handler for lua functions
 local function function_handler(json_key, f, node_depth, bake_Fn)
 	bake_Fn = bake_Fn or bake_json
+	local err = function(e) return string.format("function() - But: %s.", e) end
 	
 	local info = debug.getinfo(f, "S") 
-	if not info or type(info) ~= "table" then 
-		return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, "function()"))
+	if type(info) ~= "table" then 
+		return bake_Fn(type_dispatcher(json_key, err("debugging failed"), node_depth, no_bake))
 	end
     
 	-- parsing the source until `info.linedefined` and extract function information
 	local get_function_info = function() 
-		local pat_local, pat_name_args = "local%s+", "([%a_-]+)%s*%((.*)%)" -- two group matching
-		local path = info.source:sub(2):gsub("[\\/|\\]", "\\\\")
 		local n = 1
-		for line in io.lines(path) do			
+		local source = io.open(info.source:sub(2):gsub("[\\/|\\]", "\\\\"), "r")
+		if not source then return "", "", "", err("Couldn't open script file for parsing") end
+		for line in source:lines() do			
 			if n == info.linedefined then
-				local isLocal = string.match(line, pat_local) ~= nil
-				local fn_name, fn_args = string.match(line, pat_name_args)
+				local isLocal = string.match(line, "local%s+") ~= nil
+				local fn_name, fn_args = string.match(line, "([%a_-]+)%s*%((.*)%)") -- two group matching
 				fn_name = fn_name == "function" and "anonymous" or fn_name
-				fn_args = fn_name == "anonymous" and fn_args:gsub("%).*", "") or fn_args
-				return isLocal, fn_name, fn_args
+				fn_args = fn_name == "anonymous" and fn_args:gsub("%).*", "") or fn_args -- remove any tailing string after closing brackets
+				source:close()
+				return isLocal, fn_name, fn_args, nil
 			end
 			n = n + 1
 		end 
+		source:close()
+		return "", "", "", err("Couldn't retrieve any function info")
 	end
 	
-	local isLocal, name, args = get_function_info()
+	local isLocal, name, args, any_error = get_function_info()
+	if any_error then return bake_Fn(type_dispatcher(json_key, any_error, node_depth, no_bake)) end
+
 	local function_table = {
 		["type"] = info.what .. "-Function",
 		["name"] = name,
