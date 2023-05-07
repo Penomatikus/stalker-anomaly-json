@@ -184,7 +184,7 @@ local function userdata_handler(json_key, u, node_depth, bake_Fn)
 	return bake_Fn(string.format('%s"%s": "%s"', ident(node_depth), json_key, "unsupported userdata type"))
 end
 
----register json_handlers after the compilier kowns about the handlers
+---register json_handlers after the compiler kowns about the handlers
 json_handlers = {
 	["boolean"] = boolean_handler,
 	["function"] = function_handler,
