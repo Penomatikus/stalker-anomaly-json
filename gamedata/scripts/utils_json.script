@@ -62,7 +62,7 @@ local json_handlers = { }
 ---@param bake_Fn? function Default is `bake_json(data)` to apply a root encapsulation or not  
 ---@return string JSON JSON representation of the value
 local function type_dispatcher(json_key, value, node_depth, bake_Fn)
-	json_key = json_key or "missing key"
+	json_key = json_key or "missing_key"
 	local cmd = type(value)
 	local handler = json_handlers[cmd]
 	if not handler then
@@ -212,7 +212,7 @@ end
 ---@param value any any of `boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil`
 ---@param filename string
 function to_logfile(value, filename)
-	local fname = filename and filename or "log"
+	local fname = filename or "log"
 	local appdatalog = getFS():update_path("$logs$","")
 	local logfile = io.open(appdatalog .. "/" .. fname .. ".json","w")
 	if logfile then
