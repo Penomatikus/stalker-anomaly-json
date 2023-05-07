@@ -122,7 +122,7 @@ end
 ---A json handler for lua strings
 local function string_handler(json_key, s, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn or bake_json
-	local format = s == "null" and '%s"%s": %s' or '%s"%s": "%s"' -- incase a table uses "nil" to indicate nil 
+	local format = s == "null" and '%s"%s": %s' or '%s"%s": "%s"' -- in case a table uses "nil" to indicate nil 
 	return bake_Fn(string.format(format, ident(node_depth), json_key, tostring(s)))
 end
 
@@ -139,7 +139,7 @@ local function function_handler(json_key, f, node_depth, bake_Fn)
 	-- parsing the source until `info.linedefined` and extract function information
 	local get_function_info = function() 
 		local n = 1
-		local source = io.open(info.source:sub(2):gsub("[\\/|\\]", "\\\\"), "r") -- remove the "@" prefix and replacing any "/" and "\" to "\\"
+		local source = io.open(info.source:sub(2):gsub("[\\/|\\]", "\\\\"), "r") -- remove the "@" prefix and replacing any "/" and "\" with "\\"
 		if not source then return "", "", "", err("Couldn't open script file for parsing") end
 		for line in source:lines() do			
 			if n == info.linedefined then
@@ -199,7 +199,7 @@ json_handlers = {
 -- Global functions
 --------------------------------------------------------------
 
----to_json takes converts a Lua value to a valid JSON string.
+---to_json converts a Lua value to a valid JSON string. The keyname is used as the root-node JSON key.
 ---@param value boolean|number|string|table|userdata For userdata only CTime can be parsed
 ---@param keyname string If not set, keyname is "missing_key"
 ---@return string JSON A Valid string representation of value
