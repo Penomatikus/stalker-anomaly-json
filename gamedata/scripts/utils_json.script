@@ -139,7 +139,7 @@ local function function_handler(json_key, f, node_depth, bake_Fn)
 	-- parsing the source until `info.linedefined` and extract function information
 	local get_function_info = function() 
 		local n = 1
-		local source = io.open(info.source:sub(2):gsub("[\\/|\\]", "\\\\"), "r")
+		local source = io.open(info.source:sub(2):gsub("[\\/|\\]", "\\\\"), "r") -- remove the "@" prefix and replacing any "/" and "\" to "\\"
 		if not source then return "", "", "", err("Couldn't open script file for parsing") end
 		for line in source:lines() do			
 			if n == info.linedefined then
@@ -199,18 +199,18 @@ json_handlers = {
 -- Global functions
 --------------------------------------------------------------
 
----to_json takes a Lua value and a desired key name and creates a valid json.
----@param value any any of boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil 
----@param keyname string
----@return string
+---to_json takes converts a Lua value to a valid JSON string.
+---@param value boolean|number|string|table|userdata For userdata only CTime can be parsed
+---@param keyname string If not set, keyname is "missing_key"
+---@return string JSON A Valid string representation of value
 function to_json(value, keyname) 
 	return type_dispatcher(keyname, value, 1)
 end
 
----to_logfile takes a Lua value and a desired filename and writes the valid json representation to 
----./appdata/logs/filename.json. The filename is handled as the root-node json key.
----@param value any any of `boolean, number, string, table, userdata (CTime -> RFC3339+02:00) and nil`
----@param filename string
+---to_logfile converts a Lua value to a JSON file with the specified name in `./appdata/logs/`.
+---The filename is used as the root-node JSON key. Prints a debug message to std if the file creation failed.
+---@param value boolean|number|string|table|userdata For userdata only CTime can be parsed
+---@param filename string If not set, the file is named "log.json"
 function to_logfile(value, filename)
 	local fname = filename or "log"
 	local appdatalog = getFS():update_path("$logs$","")
