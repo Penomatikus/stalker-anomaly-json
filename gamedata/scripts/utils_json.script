@@ -74,31 +74,6 @@ local function type_dispatcher(json_key, value, node_depth, bake_Fn)
 end
 
 ---A json handler for lua tables
--- local function table_handler(json_table_name, t, node_depth, bake_Fn)
--- 	bake_Fn = bake_Fn and bake_Fn or bake_json
--- 	local json = ""
--- 	local p_node_depth = node_depth
--- 	local c_node_depth = node_depth + 1
-
--- 	-- open then new json node
--- 	json = string.format('%s"%s": %s', ident(p_node_depth), json_table_name, open)
--- 	-- close it immediately, if the table is empty
--- 	local next = next -- Avoid indexing the global enviroment hashtable
--- 	if not next(t) then
--- 		return json .. close
--- 	end
-
--- 	json = json .. ln
-
--- 	for k, v in pairs(t) do 
--- 		-- since the table_handler uses his own baking, the dispatcher is called without the bake option
--- 		json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
--- 		-- End of node check
--- 		json = json .. (next(t, k) and "," .. ln or ln .. ident(p_node_depth) .. close)
--- 	end
-
--- 	return bake_Fn(json)
--- end
 local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	bake_Fn = bake_Fn or bake_json
 	local json = ""
@@ -188,19 +163,6 @@ local function function_handler(json_key, f, node_depth, bake_Fn)
 	}
 
 	return bake_Fn(type_dispatcher(json_key, function_table, node_depth, no_bake))
-	
-	-- local fn_type = string.format('%s"%s": "%s-Function",\n', ident(node_depth+1), "type", info.what )
-	-- local fn_name = string.format('%s"%s": "%s",\n', ident(node_depth+1), "name", name )
-	-- local fn_args = args ~= "" 
-	-- 			and  string.format('%s"%s": "%s",\n', ident(node_depth+1), "args", args)
-	-- 			or   string.format('%s"%s": %s,\n', ident(node_depth+1), "args", "null")
-	-- local fn_local = string.format('%s"%s": %s,\n', ident(node_depth+1), "local", isLocal)
-	-- local fn_sfile = string.format('%s"%s": ".%s",\n', ident(node_depth+1), "source", string.match(info.source, "\\gamedata.*") )
-	-- local fn_start = string.format('%s"%s": %d\n', ident(node_depth+1), "line", info.linedefined )
-
-	-- using bake_json(...) would result in misposition of the closing bracket 
-	-- local fn_node = open .. ln .. fn_type .. fn_name .. fn_args .. fn_local .. fn_sfile .. fn_start .. ident(node_depth) .. close
-	-- return bake_Fn(string.format('%s"%s": %s', ident(node_depth), json_key, fn_node))
 end
 
 ---A json handler for lua userdata
