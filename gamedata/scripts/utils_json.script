@@ -129,7 +129,7 @@ end
 ---A json handler for lua functions
 local function function_handler(json_key, f, node_depth, bake_Fn)
 	bake_Fn = bake_Fn or bake_json
-	local err = function(e) return string.format("function() - But: %s.", e) end
+	local err = function(msg) return string.format("function() - But: %s.", msg) end
 	
 	local info = debug.getinfo(f, "S") 
 	if type(info) ~= "table" then 
