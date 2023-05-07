@@ -57,7 +57,7 @@ local json_handlers = { }
 
 ---A dispatcher to choose the correct json handler by the type of value
 ---@param json_key string Not the json key
----@param value any boolean, number, string, table, userdata(CTime), nil
+---@param value boolean|number|string|table|userdata For userdata only CTime can be parsed
 ---@param node_depth number Not the json node depth
 ---@param bake_Fn? function Default is `bake_json(data)` to apply a root encapsulation or not  
 ---@return string JSON JSON representation of the value
