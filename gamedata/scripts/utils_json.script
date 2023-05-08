@@ -73,6 +73,9 @@ local function type_dispatcher(json_key, value, node_depth, bake_Fn)
 	return handler(json_key, value, node_depth, bake_Fn)
 end
 
+local weak_lookup = {}
+setmetatable(weak_lookup, {__mode = "k"})
+
 ---A json handler for lua tables
 local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	bake_Fn = bake_Fn or bake_json
@@ -91,11 +94,11 @@ local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	json = json .. ln
 
 	for k, v in pairs(t) do 
-		if not rawequal(t, v) then 
-			-- since the table_handler uses his own baking, the dispatcher is called without the bake option
+		if weak_lookup[v] then 
+			json = json .. type_dispatcher(k, "self reference: " .. k, c_node_depth, no_bake)
+		else
+			weak_lookup[v] = 1
 			json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
-		else 
-			json = json .. type_dispatcher(k, "self reference", c_node_depth, no_bake)
 		end
 		-- End of node check
 		json = json .. (next(t, k) and "," .. ln or ln .. ident(p_node_depth) .. close)
