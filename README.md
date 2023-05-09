@@ -2,7 +2,7 @@
 
 This script can be used by modders to create valid JSON strings or log files in S.T.A.L.K.E.R. Anomaly from nearly any data type.
 
-Provides two global functions to create valid JSON from the following Lua types: `boolean`,`number`, `string`, `table`, `userdata` and `nil`.
+Provides two global functions to create valid JSON from the following Lua types: `boolean`,`number`, `string`, `table`, `userdata`, `function` and `nil`.
 Where as userdata only allows engine class CTime which will be converted to RFC3339+02:00 (because the monolith is in Ukraine). Otherwise it just adds the value: "unsupported userdata type".  Otherwise it justs adds the value: "unsupported userdata type". Moreover it can handle deeply nested self referencing  tables. 
 
 
