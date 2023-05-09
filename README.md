@@ -1,13 +1,14 @@
 # stalker-anomaly-json
 
-Strong and resilient script, to produce valid json strings or logfiles in S.T.A.L.K.E.R. Anomaly. 
+This script can be used by modders to create valid JSON strings or log files in S.T.A.L.K.E.R. Anomaly from nearly any data type.
 
 Provides two global functions to create valid JSON from the following Lua types: `boolean`,`number`, `string`, `table`, `userdata` and `nil`.
-Where as userdata only allows engine class `CTime` which will be converted to RFC3339+02:00 (because the monolith is in urkrain). Otherwise it justs adds the value: "unsupported userdata type". 
+Where as userdata only allows engine class `CTime` which will be converted to RFC3339+02:00 (because the monolith is in urkrain). Otherwise it justs adds the value: "unsupported userdata type". Moreover it can handle deeply nested self refernceing tables. 
+
 
 The implementation is using the dispatcher pattern to decouple concerns by defining a handler for each type listed above. It maps these types to corresponding handlers, which are called to process the input.
 
-_- yes you can just dump your m_data in it_  
+_Thank you to the S.T.A.L.K.E.R. Anomaly Discord modding community!_  
 
 ### USAGE
 #### to_json(value, keyname)  
