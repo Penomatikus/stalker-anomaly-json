@@ -73,8 +73,10 @@ local function type_dispatcher(json_key, value, node_depth, bake_Fn)
 	return handler(json_key, value, node_depth, bake_Fn)
 end
 
+---A weak Lua lookup on Key-Mode. Stores any value in table_handler is coming along as key, 
+---to avoid stack overflows on selfreferencing tables. It is cleared after the json is created. 
 local weak_lookup = {}
-setmetatable(weak_lookup, {__mode = "k"})
+setmetatable(weak_lookup, {__mode = "k"}) -- See: https://www.lua.org/pil/17.1.html, also its obsolete as long as this code is called on a single thread.
 
 ---A json handler for lua tables
 local function table_handler(json_table_name, t, node_depth, bake_Fn)
@@ -96,7 +98,13 @@ local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	for k, v in pairs(t) do 
 		if weak_lookup[v] then 
 			json = json .. type_dispatcher(k, "self reference: " .. k, c_node_depth, no_bake)
+			printdbg("~ utils_json lookup")
+			printdbg(k)
+			printdbg(v)
 		else
+			printdbg("~ utils_json new")
+			printdbg(k)
+			printdbg(v)
 			weak_lookup[v] = 1
 			json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
 		end
@@ -211,7 +219,9 @@ json_handlers = {
 ---@param keyname string If not set, keyname is "missing_key"
 ---@return string JSON A Valid string representation of value
 function to_json(value, keyname) 
-	return type_dispatcher(keyname, value, 1)
+	json_str = type_dispatcher(keyname, value, 1)
+	weak_lookup = {} -- Clear the lookup to avoid potential side effects, if the key is a C function that may have been called before to_json()
+	return json_str
 end
 
 ---to_logfile converts a Lua value to a JSON file with the specified name in `./appdata/logs/`.
@@ -228,4 +238,5 @@ function to_logfile(value, filename)
 	else 
 		printdbg("~ utils_json | the file [%s.json] is unavailable", filename)
 	end
+	weak_lookup = {} -- Clear the lookup to avoid potential side effects, if the key is a C function that may have been called before to_logfile()
 end
