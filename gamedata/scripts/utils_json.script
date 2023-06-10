@@ -94,12 +94,15 @@ local function table_handler(json_table_name, t, node_depth, bake_Fn)
 	end
 
 	json = json .. ln
-
 	for k, v in pairs(t) do 
-		if weak_lookup[v] then 
-			json = json .. type_dispatcher(k, "self reference: " .. k, c_node_depth, no_bake)
-		else
-			weak_lookup[v] = 1
+		if type(v) == "table" then -- Type check on table to may use the weak_lookup, if needed
+			if weak_lookup[v] then 
+				json = json .. type_dispatcher(k, "recursive table reference: " .. k, c_node_depth, no_bake)
+			else
+				weak_lookup[v] = 1
+				json = json .. table_handler(k, v, c_node_depth, no_bake)
+			end
+		else 
 			json = json .. type_dispatcher(k, v, c_node_depth, no_bake)
 		end
 		-- End of node check
