@@ -115,6 +115,9 @@ end
 ---A json handler for lua numbers
 local function number_handler(json_key, n, node_depth, bake_Fn) 
 	bake_Fn = bake_Fn or bake_json
+	if n % 1 ~= 0 then 
+		return bake_Fn(string.format('%s"%s": %.6f', ident(node_depth), json_key, n))
+	end
 	return bake_Fn(string.format('%s"%s": %d', ident(node_depth), json_key, n))
 end
 
